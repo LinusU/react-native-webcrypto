@@ -11,6 +11,9 @@ buildscript {
 
 apply plugin: 'com.android.library'
 
+// configurations.maybeCreate("default")
+// artifacts.add("default", file("conceal-2.0.2-stripped.aar"))
+
 def safeExtGet(prop, fallback) {
     rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
 }
@@ -24,7 +27,11 @@ android {
         targetSdkVersion safeExtGet('targetSdkVersion', 26)
         versionCode 1
         versionName "1.0"
+        // multiDexEnabled = true
     }
+    // dexOptions {
+    //     preDexLibraries = false
+    // }
     lintOptions {
         abortOnError false
     }
@@ -32,8 +39,32 @@ android {
 
 repositories {
     mavenCentral()
+    flatDir {
+        // dirs 'libs'
+        dirs "$rootDir/../node_modules/react-native-webcrypto/android/libs"
+    }
 }
 
+// allprojects {
+//     repositories {
+//         flatDir {
+//             dirs 'src/main/libs'
+//         }
+//     }
+// }
+
 dependencies {
+    // https://mvnrepository.com/artifact/com.facebook.conceal/conceal
+    // compile group: 'com.facebook.conceal', name: 'conceal', version: '2.0.2'
+    // compile 'com.facebook.conceal:conceal:2.0.0@aar'
+
+    compile 'com.madgag.spongycastle:core:1.58.0.0'
+    compile 'com.madgag.spongycastle:prov:1.58.0.0'
+    // compile 'com.madgag.spongycastle:pkix:1.54.0.0'
+    // compile 'com.madgag.spongycastle:pg:1.54.0.0'
+
+    // compile (name: 'conceal-2.0.2-stripped', ext: 'aar')
+    // compile files('libs/conceal-2.0.2-stripped.aar')
+
     compile 'com.facebook.react:react-native:+'
 }

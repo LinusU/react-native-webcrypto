@@ -4,8 +4,9 @@ import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.SecretKeySpec;
 import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
 
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -18,8 +19,10 @@ import java.util.UUID;
 import java.security.AlgorithmParameters;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.Security;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.InvalidParameterSpecException;
+import java.security.spec.KeySpec;
 
 import android.util.Base64;
 
@@ -28,15 +31,28 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 
+// import org.spongycastle.jce.provider.BouncyCastleProvider;
+
+import org.spongycastle.crypto.generators.PKCS5S2ParametersGenerator;
+import org.spongycastle.crypto.digests.SHA256Digest;
+import org.spongycastle.crypto.digests.SHA512Digest;
+import org.spongycastle.crypto.digests.GeneralDigest;
+import org.spongycastle.crypto.params.KeyParameter;
+
+// import com.facebook.android.crypto.keychain.AndroidConceal;
+// import com.facebook.cipher.jni.PBKDF2Hybrid;
+
 class CryptoKey {
   final String id;
-  final SecretKeySpec spec;
+  final String algorithm;
+  final byte[] data;
   final Boolean extractable;
   final Set<String> usages;
 
-  public CryptoKey(SecretKeySpec spec, Boolean extractable, String encodedUsages) {
+  public CryptoKey(String algorithm, byte[] data, Boolean extractable, String encodedUsages) {
     this.id = UUID.randomUUID().toString();
-    this.spec = spec;
+    this.algorithm = algorithm;
+    this.data = data;
     this.extractable = extractable;
     this.usages = new HashSet<String>();
 
@@ -54,6 +70,9 @@ public class RNWebcryptoModule extends ReactContextBaseJavaModule {
     super(reactContext);
     this.reactContext = reactContext;
     this.keys = new HashMap<String, CryptoKey>();
+
+    // Security.insertProviderAt(new BouncyCastleProvider(), 1);
+    // try { AndroidConceal.get().nativeLibrary.ensureCryptoLoaded(); } catch (Exception e) {}
   }
 
   @Override
@@ -62,11 +81,11 @@ public class RNWebcryptoModule extends ReactContextBaseJavaModule {
   }
 
   @ReactMethod
-  public void importKey(String format, String encodedKeyData, String algo, Boolean extractable, String encodedUsages, final Promise promise) {
-    assert algo == "AES-GCM";
+  public void importKey(String format, String encodedKeyData, String algorithm, Boolean extractable, String encodedUsages, final Promise promise) {
+    assert format == "raw";
 
     byte[] keyData = Base64.decode(encodedKeyData, Base64.DEFAULT);
-    CryptoKey cryptoKey = new CryptoKey(new SecretKeySpec(keyData, "AES"), extractable, encodedUsages);
+    CryptoKey cryptoKey = new CryptoKey(algorithm, keyData, extractable, encodedUsages);
 
     this.keys.put(cryptoKey.id, cryptoKey);
 
@@ -87,7 +106,7 @@ public class RNWebcryptoModule extends ReactContextBaseJavaModule {
 
     Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
 
-    cipher.init(Cipher.ENCRYPT_MODE, cryptoKey.spec, new GCMParameterSpec(128, iv));
+    cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(cryptoKey.data, "AES"), new GCMParameterSpec(128, iv));
 
     byte[] encrypted = cipher.doFinal(data);
 
@@ -108,10 +127,40 @@ public class RNWebcryptoModule extends ReactContextBaseJavaModule {
 
     Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
 
-    cipher.init(Cipher.DECRYPT_MODE, cryptoKey.spec, new GCMParameterSpec(128, iv));
+    cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(cryptoKey.data, "AES"), new GCMParameterSpec(128, iv));
 
     byte[] decrypted = cipher.doFinal(data);
 
     promise.resolve(Base64.encodeToString(decrypted, Base64.DEFAULT));
+  }
+
+  @ReactMethod
+  void deriveBitsPbkdf2(String keyId, String encodedSalt, int iterationCount, int keyLength, Promise promise) throws Exception {
+    CryptoKey cryptoKey = this.keys.get(keyId);
+
+    if (!cryptoKey.usages.contains("deriveBits")) {
+      promise.reject("INVALID_ACCESS", "This key cannot be used for deriving bits");
+      return;
+    }
+
+    byte[] salt = Base64.decode(encodedSalt, Base64.DEFAULT);
+    PKCS5S2ParametersGenerator gen = new PKCS5S2ParametersGenerator(new SHA256Digest());
+
+    gen.init(cryptoKey.data, salt, iterationCount);
+
+    byte[] derived = ((KeyParameter) gen.generateDerivedParameters(keyLength)).getKey();
+
+
+    // PBKDF2Hybrid encryptionKeyGenerator = new PBKDF2Hybrid();
+    // encryptionKeyGenerator.setIterations(iterationCount);
+    // encryptionKeyGenerator.setSalt(salt, 0, salt.length);
+    // encryptionKeyGenerator.setKeyLengthInBytes(keyLength);
+    // encryptionKeyGenerator.setPassword(cryptoKey.data, 0, cryptoKey.data.length);
+
+    // byte[] derived = encryptionKeyGenerator.generate();
+
+
+
+    promise.resolve(Base64.encodeToString(derived, Base64.DEFAULT));
   }
 }

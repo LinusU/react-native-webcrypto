@@ -32,21 +32,21 @@ const subtle = {
   /**
    * @param {'raw'} format
    * @param {ArrayBuffer} keyData
-   * @param {'AES-GCM'} algo
+   * @param {'AES-GCM' | 'PBKDF2' | { name: 'AES-GCM' | 'PBKDF2' }} algo
    * @param {boolean} extractable
    * @param {('encrypt' | 'decrypt')[]} usages
    * @returns {Promise<CryptoKey>}
    */
   async importKey (format, keyData, algo, extractable, usages) {
+    if (typeof algo === 'object' && typeof algo.name === 'string' && Object.keys(algo).length === 1) {
+      algo = algo.name
+    }
+
     if (format !== 'raw') throw new Error(`Format not implemented: ${format}`)
     if (!(keyData instanceof ArrayBuffer)) throw new TypeError('keyData must be an ArrayBuffer')
-    if (algo !== 'AES-GCM') throw new Error(`Algorithm not implemented: ${algo}`)
+    if (algo !== 'AES-GCM' && algo !== 'PBKDF2') throw new Error(`Algorithm not implemented: ${algo}`)
     if (typeof extractable !== 'boolean') throw new TypeError('extractable must be a boolean')
     if (!Array.isArray(usages)) throw new TypeError('usages must be an array')
-
-    for (const usage of usages) {
-      if (usage !== 'encrypt' && usage !== 'decrypt') throw new Error(`Usage not implemented: ${usage}`)
-    }
 
     const keyId = await RNWebcrypto.importKey(format, base64Encode(new Uint8Array(keyData)), algo, extractable, usages.join(','))
     const key = new CryptoKey('secret', extractable, algo, usages)
@@ -101,6 +101,17 @@ const subtle = {
 
     return decodeToBuffer(encoded)
   },
+
+  async deriveBits (algorithm, baseKey, length) {
+    if (typeof algorithm !== 'object') throw new Error(`Algorithm not implemented: ${algorithm}`)
+    if (algorithm.name !== 'PBKDF2') throw new Error(`Algorithm not implemented: ${algorithm.name}`)
+    if (!(algorithm.salt instanceof ArrayBuffer)) throw new TypeError('algorithm.salt must be an ArrayBuffer')
+    if (typeof algorithm.iterations !== 'number') throw new TypeError('algorithm.iterations must be a number')
+    if (typeof algorithm.hash !== 'object') throw new TypeError('algorithm.hash must be a number')
+    if (algorithm.hash.name !== 'SHA-512') throw new Error(`Algorithm not implemented: ${algorithm.hash.name}`)
+
+    return RNWebcrypto.deriveBitsPbkdf2(internalKeyMap.get(baseKey), base64Encode(new Uint8Array(algorithm.salt)), algorithm.iterations, length)
+  }
 }
 
 if (typeof global.crypto !== 'object') {

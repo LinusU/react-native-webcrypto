@@ -7,6 +7,7 @@ import { AppRegistry, Text, View } from 'react-native'
 import { name as appName } from './app.json'
 
 import './test/aes-gcm'
+import './test/pbkdf2'
 
 class App extends Component {
   constructor (props) {
@@ -18,12 +19,14 @@ class App extends Component {
     for (const name of Object.keys(tests)) {
       this.setState({ [name]: 'running' })
 
+      const start = Date.now()
+
       try {
         await tests[name]()
-        this.setState({ [name]: 'success' })
+        this.setState({ [name]: `success (${Date.now() - start}ms)` })
       } catch (err) {
+        this.setState({ [name]: `error (${Date.now() - start}ms)` })
         console.error(err)
-        this.setState({ [name]: 'error' })
       }
     }
   }

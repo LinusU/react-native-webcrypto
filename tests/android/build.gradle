@@ -28,6 +28,10 @@ allprojects {
             url 'https://maven.google.com/'
             name 'Google'
         }
+        flatDir {
+            dirs 'libs'
+            dirs "$rootDir/../node_modules/react-native-webcrypto/android/libs"
+        }
     }
 }
 
