@@ -19,16 +19,16 @@ function stringifyArrayBuffer (ab) {
 
 let key1
 
-it('imports a key', async () => {
+it('AES-GCM - imports a key', async () => {
   key1 = await crypto.subtle.importKey('raw', keyData1.buffer, 'AES-GCM', false, ['encrypt', 'decrypt'])
 })
 
-it('encrypts a simple message', async () => {
+it('AES-GCM - encrypts a simple message', async () => {
   const result = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv1.buffer }, key1, plaintext1.buffer)
   assert.strictEqual(stringifyArrayBuffer(result), stringifyArrayBuffer(ciphertext1))
 })
 
-it('decrypts a simple message', async () => {
+it('AES-GCM - decrypts a simple message', async () => {
   const result = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv1.buffer }, key1, ciphertext1.buffer)
   assert.strictEqual(stringifyArrayBuffer(result), stringifyArrayBuffer(plaintext1))
 })

@@ -28,27 +28,24 @@ class CryptoKey {
 /** @type WeakMap<CryptoKey,string> */
 const internalKeyMap = new WeakMap()
 
+function stringify (data) {
+  return JSON.stringify(JSON.stringify(data, (key, value) => {
+    if (value instanceof ArrayBuffer) return `FC27F74E-7BDE-49A8-8696-F5453810E05D:${base64Encode(new Uint8Array(value))}`
+    if (value instanceof Uint8Array) return `2DA57A17-C158-4177-BC4E-2EAE1A21D25B:${base64Encode(value)}`
+    if (value instanceof CryptoKey) return `1F0A2C3A-F721-417C-9C67-9204BAB92CA3:${internalKeyMap.get(value)}`
+
+    return value
+  }))
+}
+
 const subtle = {
-  /**
-   * @param {'raw'} format
-   * @param {ArrayBuffer} keyData
-   * @param {'AES-GCM'} algo
-   * @param {boolean} extractable
-   * @param {('encrypt' | 'decrypt')[]} usages
-   * @returns {Promise<CryptoKey>}
-   */
   async importKey (format, keyData, algo, extractable, usages) {
     if (format !== 'raw') throw new Error(`Format not implemented: ${format}`)
     if (!(keyData instanceof ArrayBuffer)) throw new TypeError('keyData must be an ArrayBuffer')
-    if (algo !== 'AES-GCM') throw new Error(`Algorithm not implemented: ${algo}`)
     if (typeof extractable !== 'boolean') throw new TypeError('extractable must be a boolean')
     if (!Array.isArray(usages)) throw new TypeError('usages must be an array')
 
-    for (const usage of usages) {
-      if (usage !== 'encrypt' && usage !== 'decrypt') throw new Error(`Usage not implemented: ${usage}`)
-    }
-
-    const keyId = await RNWebcrypto.importKey(format, base64Encode(new Uint8Array(keyData)), algo, extractable, usages.join(','))
+    const keyId = await RNWebcrypto.importKey(stringify([format, keyData, algo, extractable, usages]))
     const key = new CryptoKey('secret', extractable, algo, usages)
 
     internalKeyMap.set(key, keyId)
@@ -56,50 +53,32 @@ const subtle = {
     return key
   },
 
-  /**
-   * @param {{ name: 'AES-GCM', iv: ArrayBuffer }} algorithm
-   * @param {CryptoKey} key
-   * @param {ArrayBuffer} data
-   * @returns {Promise<ArrayBuffer>}
-   */
   async encrypt (algorithm, key, data) {
-    if (typeof algorithm !== 'object') throw new Error(`Algorithm not implemented: ${algorithm}`)
-    if (algorithm.name !== 'AES-GCM') throw new Error(`Algorithm not implemented: ${algorithm.name}`)
-    if (!(algorithm.iv instanceof ArrayBuffer)) throw new TypeError('algorithm.iv must be an ArrayBuffer')
-    if ('additionalData' in algorithm) throw new Error('additionalData not supported')
-    if ('tagLength' in algorithm) throw new Error('tagLength not supported')
-
     if (!(key instanceof CryptoKey)) throw new TypeError('key must be an CryptoKey')
     if (!(data instanceof ArrayBuffer)) throw new TypeError('data must be an ArrayBuffer')
 
     if (!internalKeyMap.has(key)) throw new Error('Invalid key')
 
-    const encoded = await RNWebcrypto.encryptAesGcm(internalKeyMap.get(key), base64Encode(new Uint8Array(algorithm.iv)), base64Encode(new Uint8Array(data)))
-
-    return decodeToBuffer(encoded)
+    return decodeToBuffer(await RNWebcrypto.encrypt(stringify([algorithm, key, data])))
   },
 
-  /**
-   * @param {{ name: 'AES-GCM', iv: ArrayBuffer }} algorithm
-   * @param {CryptoKey} key
-   * @param {ArrayBuffer} data
-   * @returns {Promise<ArrayBuffer>}
-   */
   async decrypt (algorithm, key, data) {
-    if (typeof algorithm !== 'object') throw new Error(`Algorithm not implemented: ${algorithm}`)
-    if (algorithm.name !== 'AES-GCM') throw new Error(`Algorithm not implemented: ${algorithm.name}`)
-    if (!(algorithm.iv instanceof ArrayBuffer)) throw new TypeError('algorithm.iv must be an ArrayBuffer')
-    if ('additionalData' in algorithm) throw new Error('additionalData not supported')
-    if ('tagLength' in algorithm) throw new Error('tagLength not supported')
-
     if (!(key instanceof CryptoKey)) throw new TypeError('key must be an CryptoKey')
     if (!(data instanceof ArrayBuffer)) throw new TypeError('data must be an ArrayBuffer')
 
     if (!internalKeyMap.has(key)) throw new Error('Invalid key')
 
-    const encoded = await RNWebcrypto.decryptAesGcm(internalKeyMap.get(key), base64Encode(new Uint8Array(algorithm.iv)), base64Encode(new Uint8Array(data)))
+    return decodeToBuffer(await RNWebcrypto.decrypt(stringify([algorithm, key, data])))
+  },
 
-    return decodeToBuffer(encoded)
+  async deriveBits (algorithm, key, bits) {
+    if (!(key instanceof CryptoKey)) throw new TypeError('key must be an CryptoKey')
+    if (typeof bits !== 'number') throw new TypeError('bits must be a number')
+    if (bits < 0 || !Number.isInteger(bits)) throw new TypeError('bits must be a positive integer')
+
+    if (!internalKeyMap.has(key)) throw new Error('Invalid key')
+
+    return decodeToBuffer(await RNWebcrypto.deriveBits(stringify([algorithm, key, bits])))
   },
 }
 

@@ -7,6 +7,8 @@ import { AppRegistry, Text, View } from 'react-native'
 import { name as appName } from './app.json'
 
 import './test/aes-gcm'
+import './test/hkdf'
+import './test/pbkdf2'
 
 class App extends Component {
   constructor (props) {
