@@ -1,6 +1,6 @@
 {
   "name": "react-native-webcrypto",
-  "version": "1.0.0-alpha.2",
+  "version": "1.0.0-alpha.3",
   "license": "MIT",
   "repository": "LinusU/react-native-webcrypto",
   "scripts": {
