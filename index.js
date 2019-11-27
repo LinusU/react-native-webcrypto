@@ -79,7 +79,7 @@ const subtle = {
     if (!internalKeyMap.has(key)) throw new Error('Invalid key')
 
     return decodeToBuffer(await RNWebcrypto.deriveBits(stringify([algorithm, key, bits])))
-  },
+  }
 }
 
 if (typeof global.crypto !== 'object') {
